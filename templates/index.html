@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Camera stage</title>
+</head>
+<body>
+    <h2>Camera Stage</h2>
+    <canvas id="machine_frame" width="400" height="300" style="border:1px solid #000;"></canvas>
+    <canvas id="image_frame" width="400" height="300" style="border:1px solid #000;"></canvas>
+    <p id="coords">X: 0, Y: 0</p>
+
+    <button id="capture_btn">capture</button>
+    <button id="home">home</button>
+
+    <button id="clear_img">clear</button>
+    <button id="clear_img">download</button>
+
+    <button id="move_up">up</button>
+    <button id="move_down">up</button>
+    
+    <script src="{{ url_for('static', filename='index.js') }}"></script>
+</body>
+</html>
