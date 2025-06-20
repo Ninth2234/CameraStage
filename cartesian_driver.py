@@ -2,6 +2,8 @@ from serial import Serial
 import threading
 import time
 from flask import Flask, jsonify,request
+from flask_cors import CORS
+
 import logging
 
 import serial
@@ -35,6 +37,7 @@ wait_event = threading.Event()
 
 # Flask app
 app = Flask(__name__)
+CORS(app)
 
 # Modify your read_task:
 def read_task():
@@ -58,11 +61,20 @@ def read_task():
                 break
         time.sleep(0.01)
 
-# Your Flask route modification:
-@app.route("/gcode")
+@app.route("/gcode", methods=['GET', 'POST'])
 def send_gcode():
-    print("Request args:", request.args)  # debug
+    # First try to get 'msg' from query params
     msg = request.args.get("msg", "")
+
+    # If empty and POST, try form or JSON body
+    if not msg and request.method == "POST":
+        # Try form data
+        msg = request.form.get("msg", "")
+        # Or JSON body
+        if not msg and request.is_json:
+            data = request.get_json()
+            msg = data.get("msg", "") if data else ""
+
     wait_flag = request.args.get("wait", "false").lower() == "true"
     try:
         timeout = int(request.args.get("timeout", 10))
@@ -70,7 +82,8 @@ def send_gcode():
         timeout = 10  # fallback default
 
     logger.info(f"[Flask] Received: {msg} (wait={wait_flag})")
-    print(">>>",wait_flag,request.args)
+    print(">>>", wait_flag, request.args)
+
     try:
         gcode = msg + "\r\n"
         if wait_flag:
@@ -80,9 +93,6 @@ def send_gcode():
         ser.write(gcode.encode())
 
         if wait_flag:
-            # Clear previous event state
-            
-            # Wait max 10 seconds (adjust as needed)
             if wait_event.wait(timeout):
                 return jsonify(status="ok", sent=msg, info="wait received")
             else:
@@ -92,6 +102,8 @@ def send_gcode():
 
     except Exception as e:
         return jsonify(status="error", message=str(e)), 500
+    
+
     
 @app.route("/logs")
 def get_logs():
@@ -151,9 +163,9 @@ def connect_serial():
 # Main entry
 if __name__ == "__main__":
     try:
-        _connect("COM19",115200)
+        _connect("/dev/ttyUSB0",115200)
         # Start Flask (non-blocking if needed)
-        app.run(host="0.0.0.0", port=5000)
+        app.run(host="0.0.0.0", port=5005)
 
         
     

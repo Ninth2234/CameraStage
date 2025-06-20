@@ -17,18 +17,23 @@ from gevent.pywsgi import WSGIServer
 from flask import Flask, render_template, request, redirect, Response
 # from selenium import webdriver
 import math
-app = Flask(__name__)
+import threading
 
+app = Flask(__name__)
+icam_lock = threading.Lock()
 
 from io import BytesIO
 first_device = py.TlFactory.GetInstance().CreateFirstDevice()
 icam = py.InstantCamera(first_device)
 icam.Open()
 icam.PixelFormat = "BGR8"
+
+
 def gen():
 
   while True:
-        image = icam.GrabOne(4000) ### 4ms time for grabbing image 
+        with icam_lock:
+            image = icam.GrabOne(4000) ### 4ms time for grabbing image 
         image = image.Array
         image = cv2.resize(image, (0,0), fx=0.8366, fy=1, interpolation=cv2.INTER_LINEAR)### 2048x2048 resolution or INTER_AREA  inter_linear is fastest for and good for downsizing 
         ret, jpeg = cv2.imencode('.jpg', image)    
@@ -187,15 +192,15 @@ def index():
 @app.route('/video')
 def video():
     """Video streaming route. Put this in the src attribute of an img tag."""
-
-    return Response(gen(),
+    with icam_lock:
+        return Response(gen(),
                         mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Flask app exposing yolov5 models")
-    parser.add_argument("--port", default=5000, type=int, help="port number")
+    parser.add_argument("--port", default=5006, type=int, help="port number")
     args = parser.parse_args()
     '''
     model = torch.hub.load(
