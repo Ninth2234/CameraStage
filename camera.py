@@ -13,11 +13,16 @@ CORS(app)
 # Initialize PyPylon
 camera = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice())
 camera.Open()
-print(camera.ExposureTime.GetMax(),camera.ExposureTime.GetMin())
-camera.ExposureTime.SetValue(100_000)
-print(camera.ExposureTime.Value)
+camera.PixelFormat = "BGR8"
+camera.ExposureTime.SetValue(10_000)
+camera.ReverseX.SetValue(True)
+camera.ReverseY.SetValue(True)
+
 # Shared frame variable
 latest_frame = None
+full_res_image = None
+request_full_res_image_flag = threading.Event()
+response_full_res_image_flag = threading.Event()
 frame_lock = threading.Lock()
 frame_number = 0  # global frame number
 
@@ -93,7 +98,7 @@ def status():
 
 
 def camera_thread():
-    global latest_frame, frame_number
+    global latest_frame, frame_number, full_res_image
 
     camera.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
 
@@ -101,8 +106,17 @@ def camera_thread():
         t0 = time.perf_counter()
         
         image = camera.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
-        
+        if not image.GrabSucceeded():
+            continue
         image = image.Array
+        
+        if request_full_res_image_flag.is_set():
+            
+            full_res_image = image.copy()
+            response_full_res_image_flag.set()
+            request_full_res_image_flag.clear()
+
+
         image = cv2.resize(image, (0, 0), fx=0.1, fy=0.1, interpolation=cv2.INTER_LINEAR)
         
         
@@ -123,21 +137,40 @@ def camera_thread():
 
 
 @app.route('/image')
-def get_latest_image():
-    with frame_lock:
-        if latest_frame is None:
-            return "No image available", 503
-        return Response(latest_frame, mimetype='image/jpeg')
+def get_image():
+    global full_res_image
+
+    timeout = 5
+    
+    try:
+        # print("Trying")
+        request_full_res_image_flag.set()
+        response_full_res_image_flag.wait(timeout)
+        response_full_res_image_flag.clear()
+        
+        if full_res_image is not None:
+            ret, png = cv2.imencode('.png', full_res_image)
+            if not ret:            
+                return "PNG encoding failed", 500
+            full_res_image = None
+            return Response(png.tobytes(), mimetype='image/png'),200
+        
+        return "No image result", 500
+    except Exception as e:
+        return f"Error: {str(e)}", 500
+
+
 
 @app.route('/video')
 def stream():
     def generate():
-        last_send = 0
+        
         min_interval = 1/30
         frame_count = 0
         fps_start_time = time.perf_counter()
 
-        last_send = frame_number
+        last_send = time.perf_counter()
+        last_frame = frame_number
 
         while True:
 
@@ -147,12 +180,12 @@ def stream():
                 time.sleep(min_interval - elapsed)
     
             with frame_lock:
-                if frame_number == last_send:
+                if frame_number == last_frame:
                     frame = None  # no new frame yet
                     
                 else:
                     frame = latest_frame
-                    last_send = frame_number  # update last sent frame number
+                    last_frame = frame_number  # update last sent frame number
         
             if frame is not None:
                 yield (b'--frame\r\n'
