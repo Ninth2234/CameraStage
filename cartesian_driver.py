@@ -163,7 +163,7 @@ def connect_serial():
 # Main entry
 if __name__ == "__main__":
     try:
-        _connect("/dev/ttyUSB0",115200)
+        _connect("/dev/snapmaker",115200)
         # Start Flask (non-blocking if needed)
         app.run(host="0.0.0.0", port=5005)
 

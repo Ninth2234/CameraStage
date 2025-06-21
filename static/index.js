@@ -6,7 +6,7 @@ const mCtx = mCanvas.getContext("2d");
 const camWidth = 200;
 const camHeight = 200;
 
-const px_to_mm = 0.2;
+const px_to_mm = 0.3;
 
 const machine_limits = {x:[50,120],y:[50,120]};
 
