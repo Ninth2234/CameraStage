@@ -117,7 +117,32 @@ def send_gcode():
     
 @app.route("/pos",methods=["GET"])
 def get_pos():
-    return _send_gcode("M114", wait=True, timeout=5)
+    response,err_code = _send_gcode("M114", wait=True, timeout=5)
+
+    if response["status"] != "ok":
+        return response,err_code
+    
+    try:
+        recv_list = response.get("response", [])
+        if not isinstance(recv_list, list) or len(recv_list) != 1:
+            response["status"] = "error"
+            response["error"] = "Internal error: response should be a list with one line."
+            return response, 500 
+        parts = recv_list[0].strip().split()
+        
+        for part in parts:
+            if ":" in part:
+                axis, val = part.split(':', 1)
+                if axis in ['X', 'Y', 'Z']:
+                    response[axis.lower()] = float(val)  
+        return response,200
+    
+    except Exception as e:
+        response["status"] = "error"
+        response["error"] = str(e)
+        return response, 500
+    
+    
     
 
     
