@@ -3,10 +3,12 @@ import time
 import cv2
 import numpy as np
 from flask import Flask, Response, request, jsonify
+from flask_cors import CORS
 from pypylon import pylon
 
 # Initialize Flask app
 app = Flask(__name__)
+CORS(app)
 
 # Initialize PyPylon
 camera = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice())
@@ -19,20 +21,20 @@ latest_frame = None
 frame_lock = threading.Lock()
 frame_number = 0  # global frame number
 
+# MAX_EXPOSURE = camera.ExposureTime.GetMax()
+MAX_EXPOSURE = 1_000_000
+MIN_EXPOSURE = camera.ExposureTime.GetMin()
 
 @app.route('/exposure', methods=['GET', 'POST'])
 def exposure():
     try:
-        max_exp = camera.ExposureTime.GetMax()
-        min_exp = camera.ExposureTime.GetMin()
+        max_exp = MAX_EXPOSURE
+        min_exp = MIN_EXPOSURE
         current_exp = camera.ExposureTime.Value
 
         # Get value from JSON or query string
-        try:
-            data = request.get_json(force=True)
-        except Exception:
-            return jsonify({"status": "error", "message": "Invalid JSON body"}), 400
-        
+        data = request.get_json(silent=True)
+
         value = None
         if data and 'value' in data:
             value = data['value']
