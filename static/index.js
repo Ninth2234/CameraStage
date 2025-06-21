@@ -107,3 +107,34 @@ document.getElementById("move_down").addEventListener("click", async () => {
 
 });
 
+async function setupSlider(){
+    
+    const res = await fetch("http://192.168.31.254:5006/exposure");
+    const data = await res.json();
+        
+    if (data.status === "ok") {
+      const slider = document.getElementById("exposure_range");
+
+      // Set min, max, and current value
+      slider.min = data.min;
+      slider.max = data.max;
+      slider.value = data.current;
+
+      document.getElementById("exposure_value").value = data.current;
+    }
+}
+setupSlider();
+let debounceTimeout = null;
+document.getElementById("exposure_range").addEventListener("input", e => {
+    const value = e.target.value;
+    document.getElementById("exposure_value").value = value;
+
+    clearTimeout(debounceTimeout);
+    debounceTimeout = setTimeout(() => {
+        fetch("http://192.168.31.254:5006/exposure", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ value: value })
+        });
+    }, 200); // send only after 200 ms of inactivity
+});

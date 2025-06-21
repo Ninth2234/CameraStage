@@ -22,7 +22,13 @@
     <button id="move_down">down</button>
     
 
-    <canvas id="image_frame" width="400" height="300" style="border:1px solid #000;"></canvas>
+    <!-- <canvas id="image_frame" width="400" height="300" style="border:1px solid #000;"></canvas> -->
+
+    <br>
+    <H1>Camera Adjust</H1>
+    <label for="Expousre">Adjust value:</label>
+    <input type="range" id="exposure_range"/>
+    <output id="exposure_value">0</output>
 
     <script src="{{ url_for('static', filename='index.js') }}"></script>
 </body>
