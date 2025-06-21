@@ -67,6 +67,9 @@ def read_task():
 
 def _send_gcode(msg, wait=False, timeout=10):
     try:
+        while not msg_queue.empty():
+            msg_queue.get_nowait()
+            
         gcode = msg.strip() + "\r\n"
 
         if wait:
