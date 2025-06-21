@@ -1,5 +1,6 @@
 from serial import Serial
 import threading
+import queue
 import time
 from flask import Flask, jsonify,request
 from flask_cors import CORS
@@ -34,6 +35,7 @@ thread = None
 
 ok_event = threading.Event()
 wait_event = threading.Event()
+msg_queue = queue.Queue()
 
 # Flask app
 app = Flask(__name__)
@@ -50,8 +52,10 @@ def read_task():
                     if msg.lower().startswith("ok"):
                         ok_event.set()
                         logger.info("[EVENT] OK is SET")
-                    elif msg == "wait":
-                        if ok_event.is_set():  # only set wait_event if ok was received before
+                    
+                    if ok_event.is_set():  # only set wait_event if ok was received before
+                        msg_queue.put(msg)
+                        if msg == "wait":
                             wait_event.set()                            
                             logger.info("[EVENT] WAIT is SET")
                             logger.info("[EVENT] OK is CLEAR")
@@ -61,17 +65,42 @@ def read_task():
                 break
         time.sleep(0.01)
 
+def _send_gcode(msg, wait=False, timeout=10):
+    try:
+        gcode = msg.strip() + "\r\n"
+
+        if wait:
+            wait_event.clear()
+            ok_event.clear()
+
+        ser.write(gcode.encode())
+        logger.info(f"[GCODE] Sent: {msg.strip()} (wait={wait})")
+
+        if wait:
+            if wait_event.wait(timeout):
+                response = []
+                while not msg_queue.empty():
+                    response.append(msg_queue.get())
+                response.pop()
+                response.pop(0)
+                return {"status": "ok", "sent": msg, "response": response}, 200
+            else:
+                return {"status": "timeout", "sent": msg}, 504
+        else:
+            return {"status": "ok", "sent": msg}, 200
+
+    except Exception as e:
+        logger.error(f"[GCODE ERROR] {e}")
+        return {"status": "error", "message": str(e)}, 500
+
 @app.route("/gcode", methods=['GET', 'POST'])
 def send_gcode():
-    # First try to get 'msg' from query params
     msg = request.args.get("msg", "")
 
-    # If empty and POST, try form or JSON body
     if not msg and request.method == "POST":
-        # Try form data
-        msg = request.form.get("msg", "")
-        # Or JSON body
-        if not msg and request.is_json:
+        if request.form.get("msg"):
+            msg = request.form.get("msg")
+        elif request.is_json:
             data = request.get_json()
             msg = data.get("msg", "") if data else ""
 
@@ -79,29 +108,16 @@ def send_gcode():
     try:
         timeout = int(request.args.get("timeout", 10))
     except ValueError:
-        timeout = 10  # fallback default
+        timeout = 10
 
-    logger.info(f"[Flask] Received: {msg} (wait={wait_flag})")
-    print(">>>", wait_flag, request.args)
+    logger.info(f"[Flask] Received G-code: {msg} (wait={wait_flag})")
 
-    try:
-        gcode = msg + "\r\n"
-        if wait_flag:
-            wait_event.clear()
-            ok_event.clear()
-
-        ser.write(gcode.encode())
-
-        if wait_flag:
-            if wait_event.wait(timeout):
-                return jsonify(status="ok", sent=msg, info="wait received")
-            else:
-                return jsonify(status="timeout", sent=msg, info="wait response not received in time"), 504
-        else:
-            return jsonify(status="ok", sent=msg)
-
-    except Exception as e:
-        return jsonify(status="error", message=str(e)), 500
+    response_data, status_code = _send_gcode(msg, wait=wait_flag, timeout=timeout)
+    return jsonify(response_data), status_code
+    
+@app.route("/pos",methods=["GET"])
+def get_pos():
+    ...
     
 
     
