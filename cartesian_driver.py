@@ -126,7 +126,7 @@ def list_ports():
 
 
 def _connect(port, baudrate=115200):
-    global ser, running, thread
+    global ser, running, thread, last_port, last_baudrate
 
     # Stop previous thread & close port if open
     running = False
@@ -141,7 +141,32 @@ def _connect(port, baudrate=115200):
     thread = threading.Thread(target=read_task, daemon=True)
     thread.start()
 
+    last_port = port
+    last_baudrate = baudrate
+
     logger.info(f"[Connect] Connected to {port} @ {baudrate}")
+
+def _disconnect():
+    global running, ser, thread
+    running = False
+    if thread and thread.is_alive():
+        thread.join()
+    if ser and ser.is_open:
+        ser.close()
+        logger.info("[Disconnect] Serial port closed.")
+
+@app.route("/reconnect")
+def reconnect(delay=0.2):
+    global last_port, last_baudrate
+    logger.info("[Reconnect] Attempting reconnect...")
+    _disconnect()
+    time.sleep(delay)
+    try:
+        _connect(last_port, last_baudrate)
+        return True, f"Reconnected to {last_port}"
+    except Exception as e:
+        logger.error(f"[Reconnect Failed] {e}")
+        return False, str(e)
 
 @app.route("/connect", methods=["POST"])
 def connect_serial():
