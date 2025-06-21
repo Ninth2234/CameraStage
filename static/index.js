@@ -1,4 +1,6 @@
-console.log("hello")
+
+const socket = io();
+// const socket = io('http://localhost:5007'); // change to your server URL & port
 
 const mCanvas = document.getElementById("machine_frame");
 const mCtx = mCanvas.getContext("2d");
@@ -17,7 +19,7 @@ let offsetX, offsetY;
 
 function convertPxToMachine(x_px,y_px){
     x_machine = x_px*px_to_mm+machine_limits.x[0];
-    y_machine = y_px*px_to_mm+machine_limits.y[0];
+    y_machine = machine_limits.y[1]-y_px*px_to_mm;
     return [x_machine,y_machine]
 }
 
@@ -138,3 +140,8 @@ document.getElementById("exposure_range").addEventListener("input", e => {
         });
     }, 200); // send only after 200 ms of inactivity
 });
+
+
+document.getElementById('capture').addEventListener('click',()=>{
+    socket.emit('capture_request');
+})

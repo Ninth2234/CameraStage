@@ -2,8 +2,11 @@
 <html>
 <head>
   <title>Camera stage</title>
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+
 </head>
 <body>
+  
     <h2>Camera Stage</h2>
     <canvas id="machine_frame" width="420" height="420" style="border:1px solid #000;"></canvas>
     <img id="live_image" src="http://localhost:5006/video" alt="Live Stream" width="400" height="300" style="border:1px solid #000;"/>
@@ -12,7 +15,7 @@
     
     <p id="coords">X: 0, Y: 0</p>
 
-    <button id="capture" disabled="true">capture</button>
+    <button id="capture">capture</button>
     <button id="home">home</button>
 
     <button id="clear_img" disabled="true">clear</button>
@@ -30,6 +33,8 @@
     <input type="range" id="exposure_range"/>
     <output id="exposure_value">0</output>
 
+
+    <!-- <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script> -->
     <script src="{{ url_for('static', filename='index.js') }}"></script>
 </body>
 </html>
