@@ -106,9 +106,9 @@ def send_gcode():
 
     wait_flag = request.args.get("wait", "false").lower() == "true"
     try:
-        timeout = int(request.args.get("timeout", 10))
+        timeout = int(request.args.get("timeout", 1))
     except ValueError:
-        timeout = 10
+        timeout = 1
 
     logger.info(f"[Flask] Received G-code: {msg} (wait={wait_flag})")
 
@@ -117,7 +117,7 @@ def send_gcode():
     
 @app.route("/pos",methods=["GET"])
 def get_pos():
-    ...
+    return _send_gcode("M114", wait=True, timeout=5)
     
 
     
