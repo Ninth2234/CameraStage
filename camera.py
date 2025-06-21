@@ -1,211 +1,179 @@
-
-import argparse
-import io
-import os
-from PIL import Image
-import matplotlib.pyplot as plt # for ploting the scanned line
-import pandas as pd
-# import imutils
-from numpy import asarray
-from numpy import savetxt
+import threading
+import time
 import cv2
 import numpy as np
-import pypylon.pylon as py
-from datetime import datetime
-from gevent.pywsgi import WSGIServer
-# import torch
-from flask import Flask, render_template, request, redirect, Response
-# from selenium import webdriver
-import math
-import threading
+from flask import Flask, Response, request, jsonify
+from pypylon import pylon
 
+# Initialize Flask app
 app = Flask(__name__)
-icam_lock = threading.Lock()
 
-from io import BytesIO
-first_device = py.TlFactory.GetInstance().CreateFirstDevice()
-icam = py.InstantCamera(first_device)
-icam.Open()
-icam.PixelFormat = "BGR8"
+# Initialize PyPylon
+camera = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice())
+camera.Open()
+print(camera.ExposureTime.GetMax(),camera.ExposureTime.GetMin())
+camera.ExposureTime.SetValue(100_000)
+print(camera.ExposureTime.Value)
+# Shared frame variable
+latest_frame = None
+frame_lock = threading.Lock()
+frame_number = 0  # global frame number
 
 
-def gen():
-
-  while True:
-        with icam_lock:
-            image = icam.GrabOne(4000) ### 4ms time for grabbing image 
-        image = image.Array
-        image = cv2.resize(image, (0,0), fx=0.8366, fy=1, interpolation=cv2.INTER_LINEAR)### 2048x2048 resolution or INTER_AREA  inter_linear is fastest for and good for downsizing 
-        ret, jpeg = cv2.imencode('.jpg', image)    
-        frame = jpeg.tobytes()
-        yield (b'--frame\r\n'
-               b'Content-Type:image/jpeg\r\n'
-               b'Content-Length: ' + f"{len(frame)}".encode() + b'\r\n'
-               b'\r\n' + frame + b'\r\n')
-
-    
 @app.route('/exposure', methods=['GET', 'POST'])
 def exposure():
-    ss = icam.ExposureTime.Value
-    max = icam.ExposureTime.GetMax()
-    if request.method == 'POST':
-       # print(request.form.get('text_exposure'))
-        r = int(request.form.get('text_exposure'))
-        if r<max:
-         icam.ExposureTime.SetValue(r)
-         ss = icam.ExposureTime.Value
-    return render_template('index.html',result = ss, max = max)
-#-----------------------------------------------------------------
-    
-@app.route('/width1', methods=['GET', 'POST'])
-def width1():
-    if request.method == 'POST':
-        #print(icam.Width.GetMin())
-        r = int(request.form.get('text_width'))
-        print(r)
-       # new_width = icam.Width.GetValue() - icam.Width.GetInc()
+    try:
+        max_exp = camera.ExposureTime.GetMax()
+        min_exp = camera.ExposureTime.GetMin()
+        current_exp = camera.ExposureTime.Value
+
+        # Get value from JSON or query string
+        try:
+            data = request.get_json(force=True)
+        except Exception:
+            return jsonify({"status": "error", "message": "Invalid JSON body"}), 400
         
-    icam.Width.SetValue(r)
-    current_w  = icam.Width.GetValue()
-    return render_template('index.html',current_w = current_w)
-#-----------------------------------------------------------------
+        value = None
+        if data and 'value' in data:
+            value = data['value']
+        elif 'value' in request.args:
+            value = request.args.get('value')
 
-#-----------------------------------------------------------------
-    
-@app.route('/height1', methods=['GET', 'POST'])
-def height1():
-    if request.method == 'POST':
-        #print(icam.Width.GetMin())
-        r = int(request.form.get('text_height'))
-        #print(r)
-       # new_width = icam.Width.GetValue() - icam.Width.GetInc() 
-    icam.Height.SetValue(r)
-    return render_template('index.html')
-#-----------------------------------------------------------------
-#-----------------------------------------------------------------
-    
-@app.route('/blacklevel', methods=['GET', 'POST'])
-def blacklevel():
-    if request.method == 'POST':
-        #print(icam.Width.GetMin())
-        r = int(request.form.get('text_blacklevel'))
-        #print(r)
-       # new_width = icam.Width.GetValue() - icam.Width.GetInc() 
-    icam.BlackLevel.SetValue(r)
-    return render_template('index.html')
+        if value is None:
+            if request.method == 'POST':
+                return jsonify({
+                    "status": "error",
+                    "message": "Missing 'value' for exposure setting"
+                }), 400
+            
+            return jsonify({
+                "status": "ok",
+                "current": current_exp,
+                "min": min_exp,
+                "max": max_exp
+            }),200
 
-    
-@app.route('/gamma', methods=['GET', 'POST'])
-def gamma():
-    if request.method == 'POST':
-        #print(icam.Width.GetMin())
-        r = int(request.form.get('text_gamma'))
-        #print(r)
-       # new_width = icam.Width.GetValue() - icam.Width.GetInc() 
-    icam.Gamma.SetValue(r)
-    return render_template('index.html')
-#-----------------------------------------------------------------
-@app.route('/offsetx', methods=['GET', 'POST'])
-def offsetx():
-    if request.method == 'POST':
-        #print(icam.Width.GetMin())
-        r = int(request.form.get('text_offsetx'))
-        #print(r)
-       # new_width = icam.Width.GetValue() - icam.Width.GetInc() 
-    icam.OffsetX.SetValue(r)
-    return render_template('index.html')
-#-----------------------------------------------------------------
-#-----------------------------------------------------------------
-@app.route('/offsety', methods=['GET', 'POST'])
-def offsety():
-    if request.method == 'POST':
-        #print(icam.Width.GetMin())
-        r = int(request.form.get('text_offsety'))
-        #print(r)
-       # new_width = icam.Width.GetValue() - icam.Width.GetInc() 
-    icam.OffsetY.SetValue(r)
-    return render_template('index.html')
-#-----------------------------------------------------------------
-#-----------------------------------------------------------------
-@app.route('/gain', methods=['GET', 'POST'])
-def gain():
-    if request.method == 'POST':
-        #print(icam.Width.GetMin())
-        r = int(request.form.get('text_gain'))
-        #print(r)
-       # new_width = icam.Width.GetValue() - icam.Width.GetInc() 
-    icam.Gain.SetValue(r)
-    index()
-    return render_template('index.html')
-#-----------------------------------------------------------------
-#-----------------------------------------------------------------
-@app.route('/digital', methods=['GET', 'POST'])
-def digital():
-    if request.method == 'POST':
-        #print(icam.Width.GetMin())
-        r = int(request.form.get('text_digital'))
-        #print(r)
-       # new_width = icam.Width.GetValue() - icam.Width.GetInc() 
-    icam.DigitalShift.SetValue(r)
-    return render_template('index.html')
-#-----------------------------------------------------------------
-@app.route('/')
-def index():
-    current_w  = icam.Width.GetValue()
-    max_w = icam.Width.GetMax()
-    min_w = icam.Width.GetMin()
-    current_h  = icam.Height.GetValue()
+        try:
+            value_int = float(value)
+        except ValueError:
+            return jsonify({
+                "status": "error",
+                "message": f"Invalid value: {value}"
+            }), 400
 
-    max_h = icam.Height.GetMax()
-    min_h = icam.Height.GetMin()
+        if not (min_exp <= value_int <= max_exp):
+            return jsonify({
+                "status": "error",
+                "message": f"Value {value_int} out of range ({min_exp}–{max_exp})",
+                "min": min_exp,
+                "max": max_exp
+            }), 400
+
+        # Set the exposure if value is valid
+        camera.ExposureTime.SetValue(value_int)
+        current_exp = camera.ExposureTime.Value
+
+        # In all other cases (GET with no value), just return current status
+        return jsonify({
+            "status": "ok",
+            "current": current_exp,
+            "min": min_exp,
+            "max": max_exp
+        })
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route("/status",methods=["GET"])
+def status():
+    ...
     
-    current_offx  = icam.OffsetX.GetValue()
-    max_ox = icam.OffsetX.GetMax()
-    min_ox = icam.OffsetX.GetMin()
-    
-    current_offy  = icam.OffsetY.GetValue()
-    max_oy = icam.OffsetY.GetMax()
-    min_oy = icam.OffsetY.GetMin()
-    current_g  = icam.Gain.GetValue()
-    max_g = icam.Gain.GetMax()
-    min_g = icam.Gain.GetMin()
-    current_b  = icam.BlackLevel.GetValue()
-    max_b = icam.BlackLevel.GetMax()
-    min_b = icam.BlackLevel.GetMin()
-    current_gamma  = icam.Gamma.GetValue()
-    max_gamma = round(icam.Gamma.GetMax(), 2)
-    min_gamma = icam.Gamma.GetMin()
-    current_digital  = icam.DigitalShift.GetValue()
-    max_digital = icam.DigitalShift.GetMax()
-    min_digital = icam.DigitalShift.GetMin()
-    current_exp  = icam.ExposureTime.GetValue()
-    max_exposure = icam.ExposureTime.GetMax()
-    min_exposure = icam.ExposureTime.GetMin()
-    return render_template('index.html',max_w = max_w,min_w = min_w , max_h = max_h, min_h = min_h,
-    max_ox = max_ox, min_ox = min_ox , max_oy = max_oy, min_oy = min_oy,
-    max_g = max_g,min_g = min_g, min_b = min_b , max_b = max_b,
-    max_gamma = max_gamma , min_gamma = min_gamma,max_digital = max_digital, min_digital = min_digital,
-    max_exposure = max_exposure,min_exposure = min_exposure , current_w = current_w , current_exp = current_exp
-    ,current_h = current_h , current_g = current_g , current_digital = current_digital , current_gamma = current_gamma,
-    current_b = current_b , current_offx = current_offx , current_offy = current_offy)
+
+
+def camera_thread():
+    global latest_frame, frame_number
+
+    camera.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
+
+    while True:
+        t0 = time.perf_counter()
+        
+        image = camera.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
+        
+        image = image.Array
+        image = cv2.resize(image, (0, 0), fx=0.1, fy=0.1, interpolation=cv2.INTER_LINEAR)
+        
+        
+        t1 = time.perf_counter()
+        
+        
+        # Resize and encode to JPEG        
+        ret, jpeg = cv2.imencode('.jpg', image)
+        if not ret:
+            continue
+        t2 = time.perf_counter()
+        with frame_lock:
+            latest_frame = jpeg.tobytes()
+            frame_number += 1
+        t3 = time.perf_counter()
+
+        # print(f"Grab: {1000*(t1 - t0):.3f} ms\t Encode: {1000*(t2 - t1):.3f} ms\t Send: {1000*(t3 - t2):.3f} ms")
+
+
+@app.route('/image')
+def get_latest_image():
+    with frame_lock:
+        if latest_frame is None:
+            return "No image available", 503
+        return Response(latest_frame, mimetype='image/jpeg')
 
 @app.route('/video')
-def video():
-    """Video streaming route. Put this in the src attribute of an img tag."""
-    with icam_lock:
-        return Response(gen(),
-                        mimetype='multipart/x-mixed-replace; boundary=frame')
+def stream():
+    def generate():
+        last_send = 0
+        min_interval = 1/30
+        frame_count = 0
+        fps_start_time = time.perf_counter()
+
+        last_send = frame_number
+
+        while True:
+
+            now = time.perf_counter()
+            elapsed = now - last_send
+            if elapsed < min_interval:
+                time.sleep(min_interval - elapsed)
+    
+            with frame_lock:
+                if frame_number == last_send:
+                    frame = None  # no new frame yet
+                    
+                else:
+                    frame = latest_frame
+                    last_send = frame_number  # update last sent frame number
+        
+            if frame is not None:
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n'
+                       b'Content-Length: ' + f"{len(frame)}".encode() + b'\r\n'
+                       b'\r\n' + frame + b'\r\n')
+                frame_count += 1
+
+                # Measure FPS every second
+                if (now - fps_start_time) >= 1.0:
+                    fps = frame_count / (now - fps_start_time)
+                    print(f"[STREAM] FPS: {fps:.2f}")
+                    frame_count = 0
+                    fps_start_time = now
+            else:
+                time.sleep(0.01)  # small sleep to avoid busy wait
+
+            last_send = time.perf_counter()
+
+    return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Flask app exposing yolov5 models")
-    parser.add_argument("--port", default=5006, type=int, help="port number")
-    args = parser.parse_args()
-    '''
-    model = torch.hub.load(
-        "ultralytics/yolov5", "yolov5s", pretrained=True, force_reload=True
-    ).autoshape()  # force_reload = recache latest code
-    model.eval()
-    '''
-    app.run(host="0.0.0.0", port=args.port)  # debug=True causes Restarting with stat
+if __name__ == '__main__':
+    t = threading.Thread(target=camera_thread, daemon=True)
+    t.start()
+    app.run(host='0.0.0.0', port=5006)
