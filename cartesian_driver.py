@@ -171,7 +171,9 @@ def _disconnect():
         ser.close()
         logger.info("[Disconnect] Serial port closed.")
 
-@app.route("/reconnect")
+
+##TODO reconnect has some error
+@app.route("/reconnect", methods=["POST"])
 def reconnect(delay=0.2):
     global last_port, last_baudrate
     logger.info("[Reconnect] Attempting reconnect...")
@@ -179,10 +181,10 @@ def reconnect(delay=0.2):
     time.sleep(delay)
     try:
         _connect(last_port, last_baudrate)
-        return True, f"Reconnected to {last_port}"
+        return True, f"Reconnected to {last_port}"  # <-- Problem here
     except Exception as e:
         logger.error(f"[Reconnect Failed] {e}")
-        return False, str(e)
+        return False, str(e)  # <-- Problem here
 
 @app.route("/connect", methods=["POST"])
 def connect_serial():
