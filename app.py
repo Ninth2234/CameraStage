@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, send_file,jsonify
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 import requests
@@ -8,6 +8,8 @@ import time
 from datetime import datetime
 import os
 import json
+
+from stitcher import stitch_all_images
 
 # eventlet.monkey_patch()  # needed for async networking with eventlet
 SAVE_DIR = "captures"
@@ -95,7 +97,13 @@ def handle_capture_request():
             "message": str(e)
         })
 
-
+@app.route("/stitch", methods=["GET"])
+def stitch_route():
+    try:
+        path = stitch_all_images()
+        return send_file(path, mimetype="image/png")
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 # def background_thread():
 #     """Send image and position periodically to clients."""
 #     while True:
