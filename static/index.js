@@ -193,7 +193,7 @@ document.getElementById('capture').addEventListener('click',()=>{
 
 async function refreshStitch() {
     try {
-        const response = await fetch("/stitch", { cache: "no-cache" }); // prevent caching
+        const response = await fetch("/stitch?scale=0.1&format=jpg", { cache: "no-cache" }); // prevent caching
         if (!response.ok) {
             throw new Error("Failed to fetch stitched image");
         }
@@ -213,6 +213,21 @@ async function refreshStitch() {
         console.error("Error loading stitched image:", err);
     }
 }
+document.getElementById("clear_img").addEventListener('click',()=>{
+    fetch("/clear", {
+            method: "POST"
+        });
+    refreshStitch();
+})
+
+document.getElementById("download_img").addEventListener('click',()=>{
+    const link = document.createElement('a');
+    link.href = '/stitch?format=png&scale=1.0';  // adjust format/scale if needed
+    link.download = 'stitched_output.png';       // this triggers a download
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+})
 
 document.getElementById("stitch_refresh").addEventListener('click',()=>{
     refreshStitch();

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, send_file,jsonify,Response
+from flask import Flask, render_template, send_file,jsonify,Response,request
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 import requests
@@ -9,6 +9,9 @@ from datetime import datetime
 import os
 import json
 import cv2
+
+
+
 
 from stitcher import stitch_all_images
 
@@ -101,6 +104,19 @@ def handle_capture_request():
 @app.route("/stitch", methods=["GET"])
 def stitch_route():
     try:
+        # Get optional parameters
+        scale = float(request.args.get("scale", 1.0))   # default: no scaling
+        fmt = request.args.get("format", "png").lower() # default: PNG
+        valid_formats = ["jpg", "png"]
+
+        if fmt not in valid_formats:
+            return (
+                jsonify({
+                    "status": "error",
+                    "message": f"Invalid format '{fmt}'. Valid formats are: {valid_formats}"
+                }),
+                400
+            ) 
         t0 = time.perf_counter()
         path = stitch_all_images()  # path to the full-size stitched image
         t1 = time.perf_counter()
@@ -110,14 +126,14 @@ def stitch_route():
         if img is None:
             raise Exception(f"Failed to load image at path: {path}")
 
-        small_img = cv2.resize(img, (0, 0), fx=0.1, fy=0.1, interpolation=cv2.INTER_AREA)
+        small_img = cv2.resize(img, (0, 0), fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
 
         # Encode to PNG
-        success, buffer = cv2.imencode('.png', small_img)
+        success, buffer = cv2.imencode(f'.{fmt}', small_img)
         if not success:
             raise Exception("Image encoding failed")
 
-        return Response(buffer.tobytes(), mimetype='image/png'),200
+        return Response(buffer.tobytes(), mimetype=f'image/{fmt}'),200
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -148,6 +164,21 @@ def stitch_route():
 # def test_connect():
 #     print('Client connected')
 #     emit('message', {'data': 'Connected'})
+
+@app.route("/clear", methods=["POST"])
+def clear_captures():
+    folder = "captures"
+
+    try:
+        for filename in os.listdir(folder):
+            file_path = os.path.join(folder, filename)
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.remove(file_path)
+
+        return jsonify({"status": "success", "message": "All files in captures/ deleted."})
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/config")
 def get_config():

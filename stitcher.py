@@ -2,6 +2,7 @@ import os
 import json
 import cv2
 import numpy as np
+import time
 
 
 def load_captures_data(folder="captures"):
@@ -60,7 +61,7 @@ def stitch_all_images(calib_path="configs/telecentric_calibration.json", capture
     image_size_mm = calib["image_size_mm"]
 
     machine_limits = {"x": [50, 120], "y": [50, 120]}
-    bed_limits = machine_limits
+    
 
     canvas_limits_mm = canvas_config["canvas_limits_mm"]
 
@@ -93,4 +94,8 @@ def stitch_all_images(calib_path="configs/telecentric_calibration.json", capture
     return output_path
 
 if __name__ == "__main__":
+    t0 = time.perf_counter()
     stitch_all_images()
+    t1 = time.perf_counter()
+
+    print(t1-t0)
