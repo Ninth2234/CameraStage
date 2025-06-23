@@ -1,4 +1,4 @@
-from flask import Flask, render_template, send_file,jsonify
+from flask import Flask, render_template, send_file,jsonify,Response
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 import requests
@@ -8,6 +8,7 @@ import time
 from datetime import datetime
 import os
 import json
+import cv2
 
 from stitcher import stitch_all_images
 
@@ -100,8 +101,24 @@ def handle_capture_request():
 @app.route("/stitch", methods=["GET"])
 def stitch_route():
     try:
-        path = stitch_all_images()
-        return send_file(path, mimetype="image/png")
+        t0 = time.perf_counter()
+        path = stitch_all_images()  # path to the full-size stitched image
+        t1 = time.perf_counter()
+
+        # Read and resize the image
+        img = cv2.imread(path)
+        if img is None:
+            raise Exception(f"Failed to load image at path: {path}")
+
+        small_img = cv2.resize(img, (0, 0), fx=0.1, fy=0.1, interpolation=cv2.INTER_AREA)
+
+        # Encode to PNG
+        success, buffer = cv2.imencode('.png', small_img)
+        if not success:
+            raise Exception("Image encoding failed")
+
+        return Response(buffer.tobytes(), mimetype='image/png'),200
+
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 # def background_thread():
@@ -132,6 +149,11 @@ def stitch_route():
 #     print('Client connected')
 #     emit('message', {'data': 'Connected'})
 
+@app.route("/config")
+def get_config():
+    with open("configs/canvas_config.json") as f:
+        config = json.load(f)
+    return jsonify(config)
     
 
 if __name__ == "__main__":

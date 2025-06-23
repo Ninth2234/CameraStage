@@ -52,6 +52,9 @@ def stitch_all_images(calib_path="configs/telecentric_calibration.json", capture
     with open(calib_path, "r") as f:
         calib = json.load(f)
 
+    with open("configs/canvas_config.json","r") as f:
+        canvas_config = json.load(f)
+
     mm_per_pixel_x = calib["mm_per_pixel_x"]
     mm_per_pixel_y = calib["mm_per_pixel_y"]
     image_size_mm = calib["image_size_mm"]
@@ -59,35 +62,26 @@ def stitch_all_images(calib_path="configs/telecentric_calibration.json", capture
     machine_limits = {"x": [50, 120], "y": [50, 120]}
     bed_limits = machine_limits
 
-    canvas_limits = {
-        "x": [
-            bed_limits["x"][0] - image_size_mm[0] / 2,
-            bed_limits["x"][1] + image_size_mm[0] / 2
-        ],
-        "y": [
-            bed_limits["y"][0] - image_size_mm[1] / 2,
-            bed_limits["y"][1] + image_size_mm[1] / 2
-        ]
-    }
+    canvas_limits_mm = canvas_config["canvas_limits_mm"]
 
-    canvas_width_px = int((canvas_limits["x"][1] - canvas_limits["x"][0]) / mm_per_pixel_x)
-    canvas_height_px = int((canvas_limits["y"][1] - canvas_limits["y"][0]) / mm_per_pixel_y)
+    canvas_width_px = canvas_config["canvas_size"][0]
+    canvas_height_px = canvas_config["canvas_size"][1]
     canvas = np.zeros((canvas_height_px, canvas_width_px, 3), dtype=np.uint8)
 
     captures = load_captures_data(captures_folder)
-
     for cap in captures:
         img = cap["image"]
         x_mm = cap["coords"]["x"] - image_size_mm[0] / 2
         y_mm = cap["coords"]["y"] - image_size_mm[1] / 2
 
-        x_offset_mm = x_mm - canvas_limits["x"][0]
-        y_offset_mm = y_mm - canvas_limits["y"][0]
-
-        x_px = int(x_offset_mm / mm_per_pixel_x)
-        y_px = canvas_height_px - int(y_offset_mm / mm_per_pixel_y)
+        x_offset_mm = x_mm - canvas_limits_mm["x"][0]
+        y_offset_mm = y_mm - canvas_limits_mm["y"][0]
 
         h, w = img.shape[:2]
+
+        x_px = int(x_offset_mm / mm_per_pixel_x)
+        y_px = canvas_height_px - int(y_offset_mm / mm_per_pixel_y) - h
+
         y_end = min(canvas.shape[0], y_px + h)
         x_end = min(canvas.shape[1], x_px + w)
         y_img_end = y_end - y_px
@@ -97,3 +91,6 @@ def stitch_all_images(calib_path="configs/telecentric_calibration.json", capture
 
     cv2.imwrite(output_path, canvas)
     return output_path
+
+if __name__ == "__main__":
+    stitch_all_images()
