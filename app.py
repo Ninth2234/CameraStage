@@ -1,3 +1,4 @@
+from math import floor
 from flask import Flask, render_template, send_file,jsonify,Response,request
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
@@ -37,9 +38,10 @@ def _capture(url="http://192.168.31.254:5006/image"):
 
 def _getPos(url="http://192.168.31.254:5005/pos"):
     resp = requests.get(url, timeout=10)
-    resp.raise_for_status()
+    print(resp)
+    # resp.raise_for_status()
     data = resp.json()
-
+    print(data)
     if data.get("status") != "ok":
         return False, []
     
@@ -49,17 +51,17 @@ def _getPos(url="http://192.168.31.254:5005/pos"):
         return False, []
     
 @socketio.on('capture_request')
-def handle_capture_request():
+def capture_request():
     print("[SocketIO] CAPTURING...")
 
     # Get position
     success, pos = _getPos()
     if not success or pos is None:
         print("[SocketIO] Failed to get position")
-        emit('capture_saved', {
-            "status": "error",
-            "message": "Failed to get position"
-        })
+        # emit('capture_saved', {
+        #     "status": "error",
+        #     "message": "Failed to get position"
+        # })
         return
 
     try:
@@ -92,14 +94,14 @@ def handle_capture_request():
             json.dump(metadata, f, indent=2)
 
         print(f"[SocketIO] Image saved as {img_filename}")
-        emit("capture_saved", {"status": "ok", "filename": img_filename})
+        # emit("capture_saved", {"status": "ok", "filename": img_filename})
 
     except Exception as e:
         print("[SocketIO] Capture failed:", str(e))
-        emit('capture_saved', {
-            "status": "error",
-            "message": str(e)
-        })
+        # emit('capture_saved', {
+        #     "status": "error",
+        #     "message": str(e)
+        # })
 
 @app.route("/stitch", methods=["GET"])
 def stitch_route():
@@ -179,6 +181,51 @@ def clear_captures():
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+    
+@app.route("/scan")
+def scan():
+    x0, y0 = 50, 55
+    # x1, y1 = 70,70
+    x1, y1 = 120, 120
+    increment_x = 20
+    increment_y = 15
+
+    num_x = floor((x1 - x0) / increment_x) + 1
+    num_y = floor((y1 - y0) / increment_y) + 1
+
+    increment_x = (x1-x0)/(num_x-1)
+    increment_y = (y1-y0)/(num_y-1)
+
+
+    scan_points = []
+    for i in range(num_y):
+        for j in range(num_x):
+            x = x0 + j * increment_x
+            y = y0 + i * increment_y
+            scan_points.append((x, y))
+
+    for (x, y) in scan_points:
+        
+        gcode = f"G1 X{x} Y{y}"
+        res = requests.post("http://localhost:5005/gcode", params={"wait":"true"},json={"msg":f"{gcode}"})
+        res = requests.post("http://localhost:5005/gcode", params={"wait":"true"},json={"msg":"M114"})
+        res = requests.post("http://localhost:5005/gcode", params={"wait":"true"},json={"msg":"M114"})
+        # if res.status_code != 200:
+        #     print(f"⚠️ G-code failed at ({x}, {y}): {res.status_code} {res.text}")
+        # time.sleep(1)
+        
+        capture_request()
+        
+
+
+    return jsonify({
+        "status": "ok",
+        "points": scan_points,
+        "count": len(scan_points)
+    })
+
+
+
 
 @app.route("/config")
 def get_config():
