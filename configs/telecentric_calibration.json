@@ -1,0 +1,40 @@
+{
+    "mm_per_pixel_x": 0.0095,
+    "mm_per_pixel_y": 0.0095,
+    "pixel_per_mm_x": 105.26315789473685,
+    "pixel_per_mm_y": 105.26315789473685,
+    "origin_pixel": [
+        375,
+        1492
+    ],
+    "origin_world": [
+        116.0,
+        99.3
+    ],
+    "image_size": [
+        3088,
+        2064
+    ],
+    "image_size_mm": [
+        29.336,
+        19.608
+    ],
+    "camera_matrix": [
+        [
+            -105.26315789473685,
+            0,
+            1544.0
+        ],
+        [
+            0,
+            105.26315789473685,
+            1032.0
+        ],
+        [
+            0,
+            0,
+            1
+        ]
+    ],
+    "notes": "Telecentric calibration on June 21, 2025"
+}
