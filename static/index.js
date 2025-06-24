@@ -350,6 +350,10 @@ document.getElementById("stitch_refresh").addEventListener('click',()=>{
     console.log("hi")
     reloadStitch();
 })
+
+document.getElementById("scan").addEventListener('click',()=>{
+    fetch("/scan");
+})
 // const stage = new Konva.Stage({
 //   container: 'Konva',
 //   width: 500,
