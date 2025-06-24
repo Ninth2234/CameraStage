@@ -224,13 +224,33 @@ document.getElementById("stitch_refresh").addEventListener('click',()=>{
 
 let imageObj = new Image();
 
+// 📦 Draw rectangle around camera view
+function drawCameraRect(x, y, width, height, layer) {
+    const rect = new Konva.Rect({
+            x: x,
+            y: y,
+            width: width,
+            height: height,
+            stroke: 'red',
+            strokeWidth: 2,
+            dash: [4, 4],
+            name: 'camera-view'
+        });
+
+    // Optional: Remove previous rectangle
+    previous = layer.find('.camera-view');
+    previous.forEach(obj => obj.destroy());  // Destroy each shape
+    layer.add(rect);
+    layer.draw();
+}
+
 async function init(){
     const response = await fetch("/config");
     config = await response.json();
 
     machine_limits = config.machine_limits;
 
-    px_to_mm = config.canvas_size_mm[1]/500; // priortize height over width
+    px_to_mm = config.canvas_size_mm[0]/500; // priortize height over width
     mm_to_px = 1/px_to_mm;
     canvasWidth = config.canvas_size_mm[0]*mm_to_px;
     canvasHeight = config.canvas_size_mm[1]*mm_to_px;
@@ -265,7 +285,7 @@ async function init(){
     backgroundLayer.add(bgImage);
     backgroundLayer.draw();
     };
-    imageObj.src = "/stitch?use_cache=true"; // or MJPEG frame, etc.
+    imageObj.src = "/stitch?use_cache=true&scale=0.1"; // or MJPEG frame, etc.
 
 
     stage.on('click', (e) => {
@@ -284,22 +304,7 @@ async function init(){
         // let [xNew, yNew] = clampToBounds(x*px_to_mm,y*px_to_mm);
         camera_rect_corner = [xNew,yNew];
         
-        const rect = new Konva.Rect({
-            x: camera_rect_corner[0],
-            y: camera_rect_corner[1],
-            width: rectWidth,
-            height: rectHeight,
-            stroke: 'red',
-            strokeWidth: 2,
-            dash: [4, 4],
-            name: 'camera-view'
-        });
-
-        // Optional: Remove previous rectangle
-        previous = drawLayer.find('.camera-view');
-        previous.forEach(obj => obj.destroy());  // Destroy each shape
-        drawLayer.add(rect);
-        drawLayer.draw();
+        drawCameraRect(camera_rect_corner[0],camera_rect_corner[1],camWidth,camHeight,drawLayer)
 
         machineCoords = convertPxToMachine(xNew,yNew);
         machine_move(machineCoords[0],machineCoords[1])
@@ -325,6 +330,14 @@ async function init(){
         requestAnimationFrame(update);
     }
 
+    const respPos = await fetch('http://localhost:5005/pos');
+    machinePos = await respPos.json();
+
+    x = (machinePos.x-machine_limits.x[0])*mm_to_px;
+    y = canvasHeight-(machinePos.y-machine_limits.y[0])*mm_to_px-camHeight;
+    console.log(x,y)
+    camera_rect_corner = [x,y];
+    drawCameraRect(camera_rect_corner[0],camera_rect_corner[1],camWidth,camHeight,drawLayer);
     // Start the update loop
     update();
 }
@@ -332,11 +345,9 @@ init();
 
 function reloadStitch() {
     imageObj.src = "/stitch?cache_bust=" + new Date().getTime();
-    console.log("hll")
 }
 
 document.getElementById("stitch_refresh").addEventListener('click',()=>{
-    console.log("hi")
     reloadStitch();
 })
 

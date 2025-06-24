@@ -5,48 +5,89 @@
   <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
   <script src="https://unpkg.com/konva@9/konva.min.js"></script>
   <style>
-    .grid-container {
+    .column-container{
       display: grid;
       grid-template-columns: repeat(2, 1fr); /* 3 equal columns */
-      gap: 10px;
+      gap: 5px;
+      width: fit-content;
     }
+    .row-container {
+      display: grid;
+      grid-template-columns: repeat(1fr, 2); /* 3 equal columns */
+      gap: 5px;
+    }
+    .box {
+      border: 1px solid black;
+      padding: 0px;
+      width: 500px;
+    }
+    #Konva:hover {
+      cursor: crosshair; /* Or use pointer, grab, move, etc. */
+    }
+
   </style>
 </head>
 <body>
   
     <h2>Camera Stage</h2>
     <!-- <canvas id="machine_frame" width="420" height="420" style="border:1px solid #000;"></canvas> -->
-    <div class="grid-container">
-      <div id="Konva">
+    <div class="column-container">
+
+    
+    
+      <div class="row-container">
+        <div>
+          
+          <div class="box" >
+            <div id="Konva"></div>
+          </div>
+        </div>
+        
+        <div>
+          <img id="live_image" src="http://localhost:5006/video" alt="Live Stream" width="500" style="border:1px solid #000;"/>
+        </div>
       </div>
+
+
       <div>
-        <img id="live_image" src="http://localhost:5006/video" alt="Live Stream" height="500" style="border:1px solid #000;"/>
+        <!-- <p id="coords">X: 0, Y: 0</p> -->
+         
+        <h3>
+          Application
+        </h3>
+        <button id="scan">scan</button>
+        
+        <button id="stitch_refresh">MERGE</button>
+        <button id="capture">capture</button>
+        
+        <br>
+        <br>
+        <button id="download_img">download</button>
+        <button id="clear_img">clear</button>
+        <hr>
+        
+        <h3>
+          Machine
+        </h3>
+
+        <button id="home">home</button>
+        <button id="move_up">up</button>
+        <button id="move_down">down</button>
+        
+        <hr>
+
+        <!-- <canvas id="image_frame" width="400" height="300" style="border:1px solid #000;"></canvas> -->
+
+        
+        <h3>Camera settings</h3>
+        <label for="Expousre">Exposure:</label>
+        <input type="range" id="exposure_range"/>
+        <output id="exposure_value">0</output>
       </div>
+
     </div>
-
     
     
-    <p id="coords">X: 0, Y: 0</p>
-
-    <button id="capture">capture</button>
-    <button id="stitch_refresh">refresh</button>
-    <button id="home">home</button>
-    <button id="scan">scan</button>"
-
-    <button id="clear_img">clear</button>
-    <button id="download_img">download</button>
-
-    <button id="move_up">up</button>
-    <button id="move_down">down</button>
-    
-
-    <!-- <canvas id="image_frame" width="400" height="300" style="border:1px solid #000;"></canvas> -->
-
-    <br>
-    <H1>Camera Adjust</H1>
-    <label for="Expousre">Adjust value:</label>
-    <input type="range" id="exposure_range"/>
-    <output id="exposure_value">0</output>
 
     
     
