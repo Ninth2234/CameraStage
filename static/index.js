@@ -198,17 +198,6 @@ async function refreshStitch() {
             throw new Error("Failed to fetch stitched image");
         }
 
-        const blob = await response.blob();
-        const img = new Image();
-
-        img.onload = function () {
-            stitchedImage = img;  // ✅ Save the loaded image globally
-
-            reDraw();
-        };
-
-        img.src = URL.createObjectURL(blob);
-
     } catch (err) {
         console.error("Error loading stitched image:", err);
     }
@@ -276,7 +265,7 @@ async function init(){
     backgroundLayer.add(bgImage);
     backgroundLayer.draw();
     };
-    imageObj.src = "/stitch"; // or MJPEG frame, etc.
+    imageObj.src = "/stitch?use_cache=true"; // or MJPEG frame, etc.
 
 
     stage.on('click', (e) => {

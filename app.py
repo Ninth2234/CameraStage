@@ -109,6 +109,7 @@ def stitch_route():
         # Get optional parameters
         scale = float(request.args.get("scale", 1.0))   # default: no scaling
         fmt = request.args.get("format", "png").lower() # default: PNG
+        use_cache = request.args.get("use_cache", "false").lower() == "true"
         valid_formats = ["jpg", "png"]
 
         if fmt not in valid_formats:
@@ -120,11 +121,14 @@ def stitch_route():
                 400
             ) 
         t0 = time.perf_counter()
-        path = stitch_all_images()  # path to the full-size stitched image
+        
+        if not use_cache:
+            print("use_cache",use_cache)
+            stitch_all_images()  # path to the full-size stitched image
         t1 = time.perf_counter()
 
         # Read and resize the image
-        img = cv2.imread(path)
+        img = cv2.imread("stitched_output.png")
         if img is None:
             raise Exception(f"Failed to load image at path: {path}")
 
