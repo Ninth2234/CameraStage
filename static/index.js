@@ -191,22 +191,10 @@ document.getElementById('capture').addEventListener('click',()=>{
     socket.emit('capture_request');
 })
 
-async function refreshStitch() {
-    try {
-        const response = await fetch("/stitch?scale=0.1&format=jpg", { cache: "no-cache" }); // prevent caching
-        if (!response.ok) {
-            throw new Error("Failed to fetch stitched image");
-        }
-
-    } catch (err) {
-        console.error("Error loading stitched image:", err);
-    }
-}
 document.getElementById("clear_img").addEventListener('click',()=>{
     fetch("/clear", {
             method: "POST"
         });
-    refreshStitch();
 })
 
 document.getElementById("download_img").addEventListener('click',()=>{
@@ -218,14 +206,12 @@ document.getElementById("download_img").addEventListener('click',()=>{
     document.body.removeChild(link);
 })
 
-document.getElementById("stitch_refresh").addEventListener('click',()=>{
-    refreshStitch();
-})
 
-let imageObj = new Image();
+const imageObj = new Image();
 
 // 📦 Draw rectangle around camera view
 function drawCameraRect(x, y, width, height, layer) {
+    console.log("REDRAW")
     const rect = new Konva.Rect({
             x: x,
             y: y,
@@ -243,6 +229,29 @@ function drawCameraRect(x, y, width, height, layer) {
     layer.add(rect);
     layer.draw();
 }
+
+function updateBackgroundImage() {
+    imageObj.onload = () => {
+        const bgImage = new Konva.Image({
+            x: 0,
+            y: 0,
+            image: imageObj,
+            width: canvasWidth,
+            height: canvasHeight,
+        });
+        backgroundLayer.add(bgImage);
+        backgroundLayer.draw();
+        console.log("hello")
+    };
+    imageObj.src = "/stitch?format=jpg&scale=0.1"; // or MJPEG frame, etc.
+    console.log("hello2")
+}
+
+
+
+const backgroundLayer = new Konva.Layer();
+const overlayLayer = new Konva.Layer();
+const drawLayer = new Konva.Layer();
 
 async function init(){
     const response = await fetch("/config");
@@ -264,28 +273,14 @@ async function init(){
         height: canvasHeight,
     });
 
-    const backgroundLayer = new Konva.Layer();
-    const overlayLayer = new Konva.Layer();
-    const drawLayer = new Konva.Layer();
+
 
     stage.add(backgroundLayer);
     stage.add(overlayLayer);
     stage.add(drawLayer);
 
-    // Example: add image placeholder (for stitched image)
+    updateBackgroundImage();
     
-    imageObj.onload = () => {
-    const bgImage = new Konva.Image({
-        x: 0,
-        y: 0,
-        image: imageObj,
-        width: stage.width(),
-        height: stage.height(),
-    });
-    backgroundLayer.add(bgImage);
-    backgroundLayer.draw();
-    };
-    imageObj.src = "/stitch?use_cache=true&scale=0.1"; // or MJPEG frame, etc.
 
 
     stage.on('click', (e) => {
@@ -330,7 +325,7 @@ async function init(){
         requestAnimationFrame(update);
     }
 
-    const respPos = await fetch('http://localhost:5005/pos');
+    const respPos = await fetch('http://192.168.31.254:5005/pos');
     machinePos = await respPos.json();
 
     x = (machinePos.x-machine_limits.x[0])*mm_to_px;
@@ -343,82 +338,38 @@ async function init(){
 }
 init();
 
-function reloadStitch() {
-    imageObj.src = "/stitch?cache_bust=" + new Date().getTime();
+function request_stitch() {
+    fetch("/stitch?new=true",{
+        method:"POST"
+    })
 }
 
-document.getElementById("stitch_refresh").addEventListener('click',()=>{
-    reloadStitch();
+document.getElementById("stitch").addEventListener('click',()=>{
+    request_stitch();
 })
 
 document.getElementById("scan").addEventListener('click',()=>{
     fetch("/scan");
 })
-// const stage = new Konva.Stage({
-//   container: 'Konva',
-//   width: 500,
-//   height: 500,
-// });
-// const backgroundLayer = new Konva.Layer();
-// const overlayLayer = new Konva.Layer();
 
-// stage.add(backgroundLayer);
-// stage.add(overlayLayer);
-
-// // Optional: draw grid or bounding box
-// const grid = new Konva.Line({
-//   points: [
-//     0, 0,
-//     stage.width(), 0,
-//     stage.width(), stage.height(),
-//     0, stage.height(),
-//     0, 0
-//   ],
-//   stroke: '#aaa',
-//   strokeWidth: 1,
-// });
+document.getElementById("reset_connection").addEventListener('click',()=>{
+    fetch("http://localhost:5005/reconnect",{
+        method:"POST"
+    });
+})
 
 
-// overlayLayer.add(grid);
 
-// // Example: add image placeholder (for stitched image)
-// const imageObj = new Image();
-// imageObj.onload = () => {
-//   const bgImage = new Konva.Image({
-//     x: 0,
-//     y: 0,
-//     image: imageObj,
-//     width: stage.width(),
-//     height: stage.height(),
-//   });
-//   backgroundLayer.add(bgImage);
-//   backgroundLayer.draw();
-// };
-// imageObj.src = "/stitch"; // or MJPEG frame, etc.
+socket.on("newStitchAvailable", () => {
+    console.log("NEW STITCH AVAILABLE")
+    updateBackgroundImage();
+});
 
-// const drawLayer = new Konva.Layer();
-// stage.add(drawLayer);
+socket.on("scanFinish", () => {
+    console.log("SCAN FINSIH")
+    request_stitch();
+});
 
-// stage.on('click', (e) => {
-//   const pointerPos = stage.getPointerPosition();
-
-//   const rectWidth = 100;
-//   const rectHeight = 100;
-
-//   const rect = new Konva.Rect({
-//     x: pointerPos.x - rectWidth / 2,
-//     y: pointerPos.y - rectHeight / 2,
-//     width: rectWidth,
-//     height: rectHeight,
-//     stroke: 'red',
-//     strokeWidth: 2,
-//     dash: [4, 4],
-//     name: 'camera-view'
-//   });
-
-//   // Optional: Remove previous rectangle
-//   previous = drawLayer.find('.camera-view');
-//   previous.forEach(obj => obj.destroy());  // Destroy each shape
-//   drawLayer.add(rect);
-//   drawLayer.draw();
-// });
+socket.on("captureFinish", () => {
+    request_stitch();
+});

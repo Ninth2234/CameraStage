@@ -1,5 +1,5 @@
 from math import floor
-from flask import Flask, render_template, send_file,jsonify,Response,request
+from flask import Flask, render_template, send_file,jsonify,Response,request,make_response
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 import requests
@@ -10,11 +10,8 @@ from datetime import datetime
 import os
 import json
 import cv2
-
-
-
-
 from stitcher import stitch_all_images
+import numpy as np
 
 # eventlet.monkey_patch()  # needed for async networking with eventlet
 SAVE_DIR = "captures"
@@ -95,6 +92,8 @@ def capture_request():
 
         print(f"[SocketIO] Image saved as {img_filename}")
         # emit("capture_saved", {"status": "ok", "filename": img_filename})
+        socketio.emit("captureFinish")
+        stitch()
 
     except Exception as e:
         print("[SocketIO] Capture failed:", str(e))
@@ -103,13 +102,13 @@ def capture_request():
         #     "message": str(e)
         # })
 
-@app.route("/stitch", methods=["GET"])
-def stitch_route():
+@app.route("/stitch", methods=["GET","POST"])
+def stitch():
     try:
         # Get optional parameters
         scale = float(request.args.get("scale", 1.0))   # default: no scaling
         fmt = request.args.get("format", "png").lower() # default: PNG
-        use_cache = request.args.get("use_cache", "false").lower() == "true"
+        request_new = request.args.get("new", False)
         valid_formats = ["jpg", "png"]
 
         if fmt not in valid_formats:
@@ -119,18 +118,19 @@ def stitch_route():
                     "message": f"Invalid format '{fmt}'. Valid formats are: {valid_formats}"
                 }),
                 400
-            ) 
-        t0 = time.perf_counter()
+            )         
         
-        if not use_cache:
-            print("use_cache",use_cache)
+        if request_new:
             stitch_all_images()  # path to the full-size stitched image
-        t1 = time.perf_counter()
+            socketio.emit("newStitchAvailable")
+            return jsonify({
+                    "status": "ok",
+                }),200
+            
+            
 
         # Read and resize the image
         img = cv2.imread("stitched_output.png")
-        if img is None:
-            raise Exception(f"Failed to load image at path: {path}")
 
         small_img = cv2.resize(img, (0, 0), fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
 
@@ -139,7 +139,12 @@ def stitch_route():
         if not success:
             raise Exception("Image encoding failed")
 
-        return Response(buffer.tobytes(), mimetype=f'image/{fmt}'),200
+        response = make_response(buffer.tobytes())
+        response.headers["Content-Type"] = f"image/{fmt}"
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -174,14 +179,20 @@ def stitch_route():
 @app.route("/clear", methods=["POST"])
 def clear_captures():
     folder = "captures"
-
+    stitched_path = "stitched_output.png"
     try:
         for filename in os.listdir(folder):
             file_path = os.path.join(folder, filename)
             if os.path.isfile(file_path) or os.path.islink(file_path):
                 os.remove(file_path)
+        
+        # Overwrite stitched_output.png with black image
+        width, height = 800, 600  # adjust to your desired size
+        black_img = np.zeros((height, width, 3), dtype=np.uint8)  # note: shape is (height, width, channels)
+        cv2.imwrite(stitched_path, black_img)
+        socketio.emit("newStitchAvailable")
 
-        return jsonify({"status": "success", "message": "All files in captures/ deleted."})
+        return jsonify({"status": "success", "message": "All files deleted and stitched_output.png reset."})
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -221,7 +232,8 @@ def scan():
         capture_request()
         
 
-
+    socketio.emit("scanFinish")
+    print(">>>>","scanFInsih")
     return jsonify({
         "status": "ok",
         "points": scan_points,
