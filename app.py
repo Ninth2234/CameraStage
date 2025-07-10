@@ -199,9 +199,9 @@ def clear_captures():
     
 @app.route("/scan")
 def scan():
-    x0, y0 = 50, 55
+    x0, y0 = 15, 0
     # x1, y1 = 70,70
-    x1, y1 = 120, 120
+    x1, y1 = 155, 125
     increment_x = 20
     increment_y = 15
 
@@ -227,7 +227,7 @@ def scan():
         res = requests.post("http://localhost:5005/gcode", params={"wait":"true"},json={"msg":"M114"})
         # if res.status_code != 200:
         #     print(f"⚠️ G-code failed at ({x}, {y}): {res.status_code} {res.text}")
-        # time.sleep(1)
+        time.sleep(0.5)
         
         capture_request()
         
