@@ -1,6 +1,6 @@
 import json
 
-machine_limits = {"x": [50, 120], "y": [55, 120]}
+machine_limits = {"x": [15, 155], "y": [0, 125]}
 
 with open("configs/telecentric_calibration.json", "r") as f:
     calib = json.load(f)

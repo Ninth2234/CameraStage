@@ -130,7 +130,7 @@ document.getElementById("home").addEventListener("click", async () => {
     fetch("http://192.168.31.254:5005/gcode", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ msg: "G28\nG1Z120\nG1X80Y80" })
+        body: JSON.stringify({ msg: "G28\nG1X80Y80Z90" })
     })
 
 });
@@ -343,6 +343,7 @@ function request_stitch() {
         method:"POST"
     })
 }
+
 
 document.getElementById("stitch").addEventListener('click',()=>{
     request_stitch();
