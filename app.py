@@ -148,6 +148,62 @@ def stitch():
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route("/stitch/fusion360")
+def stitch_fusion360():
+    FUSION_CANVAS_WIDTH_MM = 17.5
+    try:
+        # Read the stitched image
+
+        show_overlay = request.args.get("overlay", "true").lower() in ["1", "true", "yes"]
+
+        img = cv2.imread("stitched_output.png")
+        if img is None:
+            raise FileNotFoundError("Stitched image not found")
+
+        # Load canvas config
+        with open("configs/canvas_config.json") as f:
+            canvas_settings = json.load(f)
+
+        canvas_size = canvas_settings.get("canvas_size_mm", [FUSION_CANVAS_WIDTH_MM])
+        canvas_width_mm = canvas_size[0] if len(canvas_size) > 0 else FUSION_CANVAS_WIDTH_MM
+
+        # Calculate scale ratio
+        scale = canvas_width_mm / FUSION_CANVAS_WIDTH_MM
+
+        if show_overlay:
+            texts = [f"X Distance:    mm", f"Y Distance:    mm",f"Z Angle: 0.0 deg ",f"Scale Plane XY: {scale:.5f}x"]
+            # position = (50, 500)  # You can adjust based on image size
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 15
+            color = (0, 255, 0)  # Green in BGR
+            thickness = 50
+            for i,line in enumerate(texts):
+                text = line
+                position = (50, 500 + i * 500)
+                cv2.putText(img, text, position, font, font_scale, color, thickness, cv2.LINE_AA)
+
+            # Encode image as PNG
+            success, encoded_img = cv2.imencode('.png', img)
+            if not success:
+                raise RuntimeError("Failed to encode image")
+
+        # Prepare response
+        response = make_response(encoded_img.tobytes())
+        response.headers.set('Content-Type', 'image/png')
+        response.headers.set(
+            'Content-Disposition',
+            f'inline; filename="f360canvas_scale_{scale:.5f}x.png"'
+        )
+        response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        return response
+
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+def cap
+
 # def background_thread():
 #     """Send image and position periodically to clients."""
 #     while True:
