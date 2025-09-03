@@ -206,6 +206,15 @@ document.getElementById("download_img").addEventListener('click',()=>{
     document.body.removeChild(link);
 })
 
+document.getElementById("download_fusion_img").addEventListener('click', () => {
+    const link = document.createElement('a');
+    link.href = '/stitch/fusion360?overlay=true';  // or any other query
+    link.download = '';  // triggers browser download instead of navigation
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+});
+
 
 const imageObj = new Image();
 
@@ -344,7 +353,7 @@ function request_stitch() {
     })
 }
 
-
+ 
 document.getElementById("stitch").addEventListener('click',()=>{
     request_stitch();
 })
