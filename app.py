@@ -202,7 +202,7 @@ def stitch_fusion360():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-def cap
+
 
 # def background_thread():
 #     """Send image and position periodically to clients."""
@@ -279,13 +279,14 @@ def scan():
         
         gcode = f"G1 X{x} Y{y}"
         res = requests.post("http://localhost:5005/gcode", params={"wait":"true"},json={"msg":f"{gcode}"})
-        res = requests.post("http://localhost:5005/gcode", params={"wait":"true"},json={"msg":"M114"})
-        res = requests.post("http://localhost:5005/gcode", params={"wait":"true"},json={"msg":"M114"})
+        res = requests.post("http://localhost:5005/gcode", params={"wait":"true"},json={"msg":"M400"})
+        
+        
         # if res.status_code != 200:
         #     print(f"⚠️ G-code failed at ({x}, {y}): {res.status_code} {res.text}")
-        time.sleep(0.5)
-        
+        time.sleep(0.1)        
         capture_request()
+        
         
 
     socketio.emit("scanFinish")
