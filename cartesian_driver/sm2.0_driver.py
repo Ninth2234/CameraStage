@@ -47,6 +47,7 @@ def read_task():
         if ser.in_waiting:
             try:
                 msg = ser.readline().decode(errors='ignore').strip()
+                logger.debug(f"[Serial Read] {msg}")
                 if msg:
                     logger.info(f"[Recv] {msg}")
                     if msg.lower().startswith("ok"):
@@ -65,7 +66,11 @@ def read_task():
                 break
         time.sleep(0.01)
 
-def _send_gcode(msg, wait=False, timeout=10):
+def _serial_write(data):
+    ser.write(data.encode())
+    logger.info(f"[Serial Write] {data.strip()}")
+
+def _send_gcode(msg, wait=False, timeout=5):
     try:
         while not msg_queue.empty():
             msg_queue.get_nowait()
@@ -76,20 +81,22 @@ def _send_gcode(msg, wait=False, timeout=10):
             wait_event.clear()
             ok_event.clear()
 
-        ser.write(gcode.encode())
-        logger.info(f"[GCODE] Sent: {gcode} (wait={wait})")
+
+        logger.info(f"[GCODE SERVICE {gcode.strip()}] Gcode: {gcode} (wait={wait})")
+        _serial_write(gcode)
+        
 
         if wait:
+            logger.info(f"[GCODE SERVICE {gcode.strip()}] waiting for response with timeout {timeout} seconds")
             if wait_event.wait(timeout):
                 response = []
                 while not msg_queue.empty():
                     msg_new = msg_queue.get()
                     response.append(msg_new)
-                    print(msg_new)
-                # response.pop()
-                # response.pop(0)
+                logger.info(f"[GCODE SERVICE {gcode.strip()}] finish waiting with response: {response}")
                 return {"status": "ok", "sent": msg, "response": response}, 200
             else:
+                logger.error(f"[GCODE SERVICE {gcode.strip()}] wait timeout after {timeout} seconds")
                 return {"status": "timeout", "sent": msg}, 504
         else:
             return {"status": "ok", "sent": msg}, 200
@@ -111,7 +118,7 @@ def send_gcode():
 
     wait_flag = request.args.get("wait", "false").lower() == "true"
     try:
-        timeout = int(request.args.get("timeout", 1))
+        timeout = int(request.args.get("timeout", 5))
     except ValueError:
         timeout = 1
 
